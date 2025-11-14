@@ -73,12 +73,12 @@ def navigate_to_next_month(sb):
 def send_email_notification(available_dates):
     """Send email notification when dates with availability < 35 are found."""
     try:
-        # Email configuration - Gmail
+        # Email configuration - get from environment variables (GitHub Secrets)
         smtp_server = 'smtp.gmail.com'
         smtp_port = 587
-        email_from = 'mluijten96@gmail.com'
-        email_password = 'evhnywdihqgxiudx'
-        email_to = ['matthijs.luijten@hotmail.com', 'daphne.smits@live.nl']
+        email_from = os.getenv('EMAIL_FROM', 'mluijten96@gmail.com')
+        email_password = os.getenv('EMAIL_PASSWORD')  # From GitHub Secrets
+        email_to = os.getenv('EMAIL_TO', 'matthijs.luijten@hotmail.com,daphne.smits@live.nl').split(',')
         
         # Create email message
         msg = MIMEMultipart()
@@ -350,3 +350,4 @@ else:
         
         # Main execution code continues here
         _run_main_logic(sb)
+
