@@ -24,4 +24,7 @@ jobs:
     - name: Run permit checker
       env:
         HEADLESS: '1'
-      run: python check_pct_availability.py
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+        EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      run: python your_script_name.py
