@@ -161,7 +161,7 @@ def parse_availability_from_cells(sb, month_name):
                         avail_text = all_title_elements[i].text.strip()
                         
                         if avail_text and avail_text.isdigit():
-                            avail_num = 36 - int(avail_text)
+                            avail_num = 35 - int(avail_text)
                             
                             # Only report if availability is less than 35
                             if avail_num > 0:
@@ -358,3 +358,4 @@ else:
         
         # Main execution code continues here
         _run_main_logic(sb)
+
