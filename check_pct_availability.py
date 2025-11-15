@@ -156,7 +156,7 @@ def parse_availability_from_cells(sb, month_name):
                             avail_num = int(avail_text)
                             
                             # Only report if availability is less than 35
-                            if avail_num < 35:
+                            if avail_num < 36:
                                 available_dates.append((day_num, avail_num))
                                 print(f"  ✓ {month_name} {day_num}: {avail_num} permits available")
                 except Exception as e:
@@ -350,4 +350,5 @@ else:
         
         # Main execution code continues here
         _run_main_logic(sb)
+
 
