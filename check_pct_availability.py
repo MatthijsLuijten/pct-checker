@@ -72,34 +72,42 @@ def navigate_to_next_month(sb):
 
 def send_email_notification(available_dates):
     """Send email notification when dates with availability < 35 are found."""
+    # Only send email if there are available dates
+    if not available_dates:
+        print("No available dates found - skipping email notification")
+        return False
+    
     try:
         # Email configuration - get from environment variables (GitHub Secrets)
         smtp_server = 'smtp.gmail.com'
         smtp_port = 587
-        email_from = os.getenv('EMAIL_FROM', 'mluijten96@gmail.com')
+        email_from = os.getenv('EMAIL_FROM')
         email_password = os.getenv('EMAIL_PASSWORD')  # From GitHub Secrets
-        email_to = os.getenv('EMAIL_TO', 'matthijs.luijten@hotmail.com,daphne.smits@live.nl').split(',')
+        email_to = os.getenv('EMAIL_TO').split(',')
         
         # Create email message
         msg = MIMEMultipart()
         msg['From'] = email_from
         msg['To'] = ', '.join(email_to)  # Join multiple recipients with comma
         
-        # Create email body
-        body_lines = ["PCT Permit Availability Alert\n", "=" * 50, "\n"]
+        # Create celebratory email
+        msg['Subject'] = '🎉 PCT Permits Available! Time to Hit the Trail! 🥾'
         
-        if available_dates:
-            msg['Subject'] = 'PCT Permit Availability Alert - Dates Available!'
-            body_lines.append("Found dates with availability less than 35 permits:\n\n")
-            for month, date, avail in available_dates:
-                body_lines.append(f"  {month} {date}: {avail} permits available\n")
-        else:
-            msg['Subject'] = 'PCT Permit Availability Check - All Dates Full'
-            body_lines.append("Checked March, April, and May.\n\n")
-            body_lines.append("All checked dates are full (35 permits).\n")
-            body_lines.append("No dates with availability less than 35 were found.\n")
+        body_lines = [
+            "🎊 GREAT NEWS! PCT PERMITS ARE AVAILABLE! 🎊\n",
+            "=" * 50,
+            "\n",
+            "🚶‍♂️ Lace up those hiking boots! 🚶‍♀️\n\n",
+            "We found dates with available permits:\n\n"
+        ]
         
+        for month, date, avail in available_dates:
+            body_lines.append(f"  ✨ {month} {date}: {avail} permits available!\n")
+        
+        body_lines.append("\n🏔️ Don't wait - these spots fill up fast! 🏔️\n")
         body_lines.append("\n" + "=" * 50)
+        body_lines.append("\nHappy trails! 🥾🌲")
+        
         body = ''.join(body_lines)
         
         msg.attach(MIMEText(body, 'plain'))
@@ -111,7 +119,7 @@ def send_email_notification(available_dates):
         server.send_message(msg)
         server.quit()
         
-        print(f"Email notification sent to {', '.join(email_to)}")
+        print(f"🎉 Celebratory email sent to {', '.join(email_to)}")
         return True
         
     except Exception as e:
@@ -153,7 +161,7 @@ def parse_availability_from_cells(sb, month_name):
                         avail_text = all_title_elements[i].text.strip()
                         
                         if avail_text and avail_text.isdigit():
-                            avail_num = 35 - int(avail_text)
+                            avail_num = 36 - int(avail_text)
                             
                             # Only report if availability is less than 35
                             if avail_num > 0:
@@ -220,11 +228,11 @@ def _run_main_logic(sb):
         print("\nAvailable dates:")
         for month, date, avail in all_available_dates:
             print(f"  {month} {date}: {avail} permits")
+        # Send email only when dates are available
+        send_email_notification(all_available_dates)
     else:
         print("\n=== RESULT: All checked dates are full (35) ===")
-    
-    # Send email notification (always, for testing purposes)
-    send_email_notification(all_available_dates)
+        print("No email sent - no available dates found")
     
     sb.sleep(5)
     # Context manager will automatically close the browser
@@ -350,6 +358,3 @@ else:
         
         # Main execution code continues here
         _run_main_logic(sb)
-
-
-
