@@ -1,5 +1,4 @@
 from seleniumbase import SB
-from selenium.webdriver.common.by import By
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -21,52 +20,28 @@ def get_current_month_year(sb):
     return None
 
 def navigate_to_next_month(sb):
-    """Navigate to the next month using various methods."""
+    """Navigate to the next month using FullCalendar next button."""
     try:
-        # Method 1: Try FullCalendar next button
-        try:
-            next_buttons = sb.find_elements(".fc-next-button")
-        except:
-            next_buttons = []
-        if not next_buttons:
-            try:
-                next_buttons = sb.find_elements("[class*='fc-next']")
-            except:
-                next_buttons = []
-        if not next_buttons:
-            # Method 2: Try XPath for buttons with arrow or next text
-            try:
-                next_buttons = sb.find_elements(By.XPATH, "//button[contains(@class, 'next') or contains(text(), '>') or contains(text(), 'Next')]")
-            except:
-                pass
-        if not next_buttons:
-            # Method 3: Try links with XPath
-            try:
-                next_buttons = sb.find_elements(By.XPATH, "//a[contains(@class, 'next') or contains(text(), '>') or contains(text(), 'Next')]")
-            except:
-                pass
-        if not next_buttons:
-            # Method 4: Try JavaScript - common calendar libraries
-            try:
-                sb.execute_script("""
-                    // Try FullCalendar
-                    if (window.$ && $.fn.fullCalendar) {
-                        $('.fc-next-button').click();
-                    }
-                    // Try other calendar libraries
-                    var nextBtn = document.querySelector('[class*="next"], [class*="Next"]');
-                    if (nextBtn) {
-                        nextBtn.click();
-                    }
-                """)
-                sb.sleep(2)
-                return True
-            except:
-                pass
-        
+        next_buttons = sb.find_elements(".fc-next-button")
         if next_buttons:
             next_buttons[0].click()
             sb.sleep(3)
+            
+            # Wait for calendar to update after navigation
+            max_wait = 20
+            wait_start = time.time()
+            while time.time() - wait_start < max_wait:
+                try:
+                    date_cells = sb.find_elements("thead td[data-date]")
+                    if date_cells and len(date_cells) > 0:
+                        # Calendar has updated
+                        sb.sleep(2)  # Extra wait for JavaScript to finish
+                        return True
+                except:
+                    pass
+                time.sleep(1)
+            
+            print("Warning: Calendar did not update after navigation, but continuing...")
             return True
         return False
     except Exception as e:
@@ -144,15 +119,41 @@ def parse_availability_from_cells(sb, month_name):
     available_dates = []
     
     try:
-        # Wait for elements to be present before finding them
-        try:
-            sb.wait_for_element_present("thead td[data-date]", timeout=10)
-        except:
-            print(f"Warning: Calendar elements not found for {month_name}")
+        # Wait for elements to be present before finding them - with retry logic
+        date_cells_found = False
+        max_retries = 3
+        for retry in range(max_retries):
+            try:
+                sb.wait_for_element_present("thead td[data-date]", timeout=20)
+                # Verify we actually found elements
+                test_cells = sb.find_elements("thead td[data-date]")
+                if test_cells and len(test_cells) > 0:
+                    date_cells_found = True
+                    break
+            except:
+                if retry < max_retries - 1:
+                    print(f"  Retry {retry + 1}/{max_retries} for {month_name} calendar elements...")
+                    sb.sleep(3)
+                else:
+                    print(f"ERROR: Calendar elements not found for {month_name} after {max_retries} retries")
+                    # Try to take a screenshot for debugging
+                    try:
+                        sb.save_screenshot(f"debug_{month_name}_failed.png")
+                        print(f"Screenshot saved as debug_{month_name}_failed.png")
+                    except:
+                        pass
+                    return available_dates
+        
+        if not date_cells_found:
             return available_dates
+        
+        # Extra sleep to ensure JavaScript is done rendering
+        sb.sleep(2)
         
         all_date_cells = sb.find_elements("thead td[data-date]")
         all_title_elements = sb.find_elements(".fc-day-grid-event .fc-content .fc-title")
+        
+        print(f"Found {len(all_date_cells)} date cells and {len(all_title_elements)} availability elements")
         
         # Match dates with availability by position (they're in the same order)
         # Empty cells at the start don't have date cells, so indices match 1-to-1
@@ -211,25 +212,7 @@ def _run_main_logic(sb):
         
         # Navigate to next month if not the last one
         if month_idx < len(months_to_check) - 1:
-            if not navigate_to_next_month(sb):
-                # Try using JavaScript to advance month
-                try:
-                    sb.execute_script("""
-                        var buttons = document.querySelectorAll('button, a, [role="button"]');
-                        for (var i = 0; i < buttons.length; i++) {
-                            var btn = buttons[i];
-                            var text = btn.textContent || btn.innerText || '';
-                            var classes = btn.className || '';
-                            if (text.includes('>') || text.includes('Next') || 
-                                classes.includes('next') || classes.includes('Next')) {
-                                btn.click();
-                                break;
-                            }
-                        }
-                    """)
-                    sb.sleep(3)
-                except Exception as e:
-                    print(f"Navigation failed: {e}")
+            navigate_to_next_month(sb)
     
     # Summary and email notification
     if found_availability:
@@ -260,10 +243,9 @@ print(f"Starting browser in {'headless' if headless_mode else 'normal'} mode..."
 if headless_mode:
     # Run in headless mode for Raspberry Pi with undetected Chrome
     with SB(uc=True, headless=True) as sb:
-        sb.open(url)
-        # Set window size for headless mode (important for proper rendering)
+        # Set window size before opening URL (faster in headless mode)
         sb.set_window_size(1920, 1080)
-        print("Window size set to 1920x1080 for headless mode")
+        sb.open(url)
         
         # Wait for page to load
         sb.sleep(5)
@@ -301,6 +283,7 @@ if headless_mode:
         sb.sleep(5)
         
         # Wait for the main content to appear
+        page_loaded = False
         start_time = time.time()
         timeout = 60
         print("Waiting for page content to load...")
@@ -308,16 +291,51 @@ if headless_mode:
             try:
                 if sb.is_text_visible("Mexican Border Availability", "h1"):
                     print("Page loaded successfully!")
+                    page_loaded = True
                     break
             except Exception:
                 pass
             time.sleep(1)
         
-        # Give calendar extra time to render in headless mode
+        if not page_loaded:
+            print("WARNING: Page content (h1) not found within timeout. Checking for calendar anyway...")
+        
+        # Wait for calendar to be fully loaded - CRITICAL for parsing
+        print("Waiting for calendar to fully render...")
+        calendar_loaded = False
+        max_wait = 45  # Increased timeout for GitHub Actions
+        wait_start = time.time()
+        
+        # First, give JavaScript time to render
         sb.sleep(5)
         
-        # Main execution code continues here
-        _run_main_logic(sb)
+        # Then poll for calendar elements
+        while time.time() - wait_start < max_wait:
+            try:
+                date_cells = sb.find_elements("thead td[data-date]")
+                if date_cells and len(date_cells) > 0:
+                    print(f"Calendar elements detected! Found {len(date_cells)} date cells")
+                    calendar_loaded = True
+                    break
+            except Exception as e:
+                pass
+            time.sleep(2)
+        
+        if not calendar_loaded:
+            print("ERROR: Calendar did not load within timeout!")
+            print("Attempting to take screenshot for debugging...")
+            try:
+                sb.save_screenshot("calendar_not_loaded.png")
+                print("Screenshot saved as calendar_not_loaded.png")
+            except:
+                pass
+            print("Exiting - cannot proceed without calendar data")
+        else:
+            # Extra wait to ensure calendar is fully interactive
+            sb.sleep(3)
+            
+            # Main execution code continues here
+            _run_main_logic(sb)
 else:
     # Run with display (for local testing)
     with SB(uc=True) as sb:
@@ -356,6 +374,7 @@ else:
         sb.sleep(5)
         
         # Wait for the main content to appear
+        page_loaded = False
         start_time = time.time()
         timeout = 60
         print("Waiting for page content to load...")
@@ -363,10 +382,42 @@ else:
             try:
                 if sb.is_text_visible("Mexican Border Availability", "h1"):
                     print("Page loaded successfully!")
+                    page_loaded = True
                     break
             except Exception:
                 pass
             time.sleep(1)
         
-        # Main execution code continues here
-        _run_main_logic(sb)
+        if not page_loaded:
+            print("WARNING: Page content (h1) not found within timeout. Checking for calendar anyway...")
+        
+        # Wait for calendar to be fully loaded
+        print("Waiting for calendar to fully render...")
+        calendar_loaded = False
+        max_wait = 45
+        wait_start = time.time()
+        
+        # First, give JavaScript time to render
+        sb.sleep(5)
+        
+        # Then poll for calendar elements
+        while time.time() - wait_start < max_wait:
+            try:
+                date_cells = sb.find_elements("thead td[data-date]")
+                if date_cells and len(date_cells) > 0:
+                    print(f"Calendar elements detected! Found {len(date_cells)} date cells")
+                    calendar_loaded = True
+                    break
+            except Exception:
+                pass
+            time.sleep(2)
+        
+        if not calendar_loaded:
+            print("ERROR: Calendar did not load within timeout!")
+            print("Exiting - cannot proceed without calendar data")
+        else:
+            # Extra wait to ensure calendar is fully interactive
+            sb.sleep(3)
+            
+            # Main execution code continues here
+            _run_main_logic(sb)
