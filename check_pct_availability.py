@@ -24,9 +24,15 @@ def navigate_to_next_month(sb):
     """Navigate to the next month using various methods."""
     try:
         # Method 1: Try FullCalendar next button
-        next_buttons = sb.find_elements(".fc-next-button")
+        try:
+            next_buttons = sb.find_elements(".fc-next-button")
+        except:
+            next_buttons = []
         if not next_buttons:
-            next_buttons = sb.find_elements("[class*='fc-next']")
+            try:
+                next_buttons = sb.find_elements("[class*='fc-next']")
+            except:
+                next_buttons = []
         if not next_buttons:
             # Method 2: Try XPath for buttons with arrow or next text
             try:
@@ -46,15 +52,12 @@ def navigate_to_next_month(sb):
                     // Try FullCalendar
                     if (window.$ && $.fn.fullCalendar) {
                         $('.fc-next-button').click();
-                        return true;
                     }
                     // Try other calendar libraries
                     var nextBtn = document.querySelector('[class*="next"], [class*="Next"]');
                     if (nextBtn) {
                         nextBtn.click();
-                        return true;
                     }
-                    return false;
                 """)
                 sb.sleep(2)
                 return True
@@ -105,6 +108,8 @@ def send_email_notification(available_dates):
             body_lines.append(f"  ✨ {month} {date}: {avail} permits available!\n")
         
         body_lines.append("\n🏔️ Don't wait - these spots fill up fast! 🏔️\n")
+        body_lines.append("\n📝 Grab your permit here:\n")
+        body_lines.append("https://portal.permit.pcta.org/manage/\n")
         body_lines.append("\n" + "=" * 50)
         body_lines.append("\nHappy trails! 🥾🌲")
         
@@ -139,7 +144,13 @@ def parse_availability_from_cells(sb, month_name):
     available_dates = []
     
     try:
-        # Find all elements globally - simple and fast approach
+        # Wait for elements to be present before finding them
+        try:
+            sb.wait_for_element_present("thead td[data-date]", timeout=10)
+        except:
+            print(f"Warning: Calendar elements not found for {month_name}")
+            return available_dates
+        
         all_date_cells = sb.find_elements("thead td[data-date]")
         all_title_elements = sb.find_elements(".fc-day-grid-event .fc-content .fc-title")
         
@@ -175,8 +186,7 @@ def parse_availability_from_cells(sb, month_name):
         
     except Exception as e:
         print(f"Error parsing cells: {e}")
-        import traceback
-        traceback.print_exc()
+        print("Note: Calendar may not have loaded properly. Continuing with other months...")
     
     return available_dates
 
@@ -213,10 +223,9 @@ def _run_main_logic(sb):
                             if (text.includes('>') || text.includes('Next') || 
                                 classes.includes('next') || classes.includes('Next')) {
                                 btn.click();
-                                return true;
+                                break;
                             }
                         }
-                        return false;
                     """)
                     sb.sleep(3)
                 except Exception as e:
@@ -304,6 +313,9 @@ if headless_mode:
                 pass
             time.sleep(1)
         
+        # Give calendar extra time to render in headless mode
+        sb.sleep(5)
+        
         # Main execution code continues here
         _run_main_logic(sb)
 else:
@@ -358,6 +370,3 @@ else:
         
         # Main execution code continues here
         _run_main_logic(sb)
-
-
-
