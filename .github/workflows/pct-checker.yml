@@ -2,8 +2,10 @@ name: PCT Permit Checker
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Run every hour
-  workflow_dispatch:  # Allow manual trigger
+    - cron: '*/15 17-23 * * *'  # 09:00–15:45 UTC-8
+    - cron: '*/15 0 * * *'      # 16:00–16:45 UTC-8
+    - cron: '0 1 * * *'         # exactly 17:00 UTC-8
+  workflow_dispatch:
 
 jobs:
   check-permits:
