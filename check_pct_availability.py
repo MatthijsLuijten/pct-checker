@@ -49,7 +49,7 @@ def navigate_to_next_month(sb):
         return False
 
 def send_email_notification(available_dates):
-    """Send email notification when dates with availability < 35 are found."""
+    """Send email notification when dates with availability < 50 are found."""
     # Only send email if there are available dates
     if not available_dates:
         print("No available dates found - skipping email notification")
@@ -173,9 +173,9 @@ def parse_availability_from_cells(sb, month_name):
                         avail_text = all_title_elements[i].text.strip()
                         
                         if avail_text and avail_text.isdigit():
-                            avail_num = 35 - int(avail_text)
+                            avail_num = 50 - int(avail_text)
                             
-                            # Only report if availability is less than 35
+                            # Only report if availability is less than 50
                             if avail_num > 0:
                                 available_dates.append((day_num, avail_num))
                                 print(f"  ✓ {month_name} {day_num}: {avail_num} permits available")
@@ -216,14 +216,14 @@ def _run_main_logic(sb):
     
     # Summary and email notification
     if found_availability:
-        print("\n=== RESULT: Found dates with availability < 35 ===")
+        print("\n=== RESULT: Found dates with availability < 50 ===")
         print("\nAvailable dates:")
         for month, date, avail in all_available_dates:
             print(f"  {month} {date}: {avail} permits")
         # Send email only when dates are available
         send_email_notification(all_available_dates)
     else:
-        print("\n=== RESULT: All checked dates are full (35) ===")
+        print("\n=== RESULT: All checked dates are full (50) ===")
         print("No email sent - no available dates found")
     
     sb.sleep(5)
@@ -421,3 +421,4 @@ else:
             
             # Main execution code continues here
             _run_main_logic(sb)
+
